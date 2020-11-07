@@ -1,5 +1,7 @@
 #include "can.h" 
 #include "stdio.h" 
+ motor_measure_t M3508_Set[4];
+CanRxMsg CanRxMessage; 
 void GPIOx_Init(void) 
 { 
 	GPIO_InitTypeDef GPIO_InitStructer; 
@@ -76,12 +78,11 @@ u8 CAN_TX_Msg(u8* Tx_BuFF,u8 len)
 	u8  Mbox; 
 	CanTxMsg CanTxMsgStructer; 
 	 
-	CanTxMsgStructer.StdId=0xff;//设定标准标识符 
-	CanTxMsgStructer.ExtId=0xff;//设定扩展标识符 
+	CanTxMsgStructer.StdId=0x12;//设定标准标识符 
+	CanTxMsgStructer.ExtId=0x12;//设定扩展标识符 
 	CanTxMsgStructer.IDE=CAN_ID_STD;//设定消息标识符类型，标准帧 
 	CanTxMsgStructer.RTR=CAN_RTR_DATA;//数据帧 
 	CanTxMsgStructer.DLC=len; 
-//	CAN_Transmit(CAN1,&CanTxMsgStructer); 
 	for(i=0;i<len;i++) 
 	{ 
 	CanTxMsgStructer.Data[i]=Tx_BuFF[i];//待传输的数据 
@@ -92,7 +93,6 @@ u8 CAN_TX_Msg(u8* Tx_BuFF,u8 len)
 	return 1; 
 	else 
 	return 0;	//发送成功 
-	//CAN_TransmitStatus是检查消息传输的状态函数 
 } 
 u8 CAN_RX_Msg(u8* Rx_BuFF) 
 { 
@@ -104,16 +104,27 @@ u8 CAN_RX_Msg(u8* Rx_BuFF)
       Rx_BuFF[i]=CanRxMsgStructer.Data[i];   
 	 return CanRxMsgStructer.DLC;	 
 } 
-CanRxMsg CanRxMessage; 
 void USB_LP_CAN1_RX0_IRQHandler(void) 
 { 
 	ITStatus Status; 
-//	(改)1.0 Status= CAN_GetFlagStatus(CAN1,CAN_IT_FMP0);//被设置与否 
+	static uint16_t i=0;
 	Status=CAN_GetITStatus(CAN1,CAN_IT_FMP0);//指定中断发生与否 
 		if(SET == !RESET) 
 	{ 
 		CAN_Receive(CAN1,CAN_FIFO0,&CanRxMessage); 
-		CAN_ClearFlag(CAN1,CAN_IT_FMP0); 
+		CAN_ClearFlag(CAN1,CAN_IT_FMP0);
+		switch(CanRxMessage.StdId)
+		{
+			case CAN_3508_M1_ID :
+			case CAN_3508_M2_ID :
+			case CAN_3508_M3_ID :
+			case CAN_3508_M4_ID :
+		{
+		i = CanRxMessage.StdId - CAN_3508_M1_ID;
+		get_motor_measure(&M3508_Set[i],CanRxMessage);
+		break;
+		}
+		}
 	} 
 } 
 void CAN_CMD_CHASSIS(int16_t motor1, int16_t motor2, int16_t motor3, int16_t motor4)
